@@ -1,0 +1,14 @@
+.{
+    .name = .donut,
+    .version = "0.0.0",
+    .fingerprint = 0x8ebc1f793621bd75, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.1",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICkENSE",
+        "README.md",
+    },
+}
