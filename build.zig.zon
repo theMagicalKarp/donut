@@ -3,7 +3,17 @@
     .version = "0.0.0",
     .fingerprint = 0x8ebc1f793621bd75, // Changing this has security and trust implications.
     .minimum_zig_version = "0.15.1",
-    .dependencies = .{},
+    .dependencies = .{
+        .zlm = .{
+            // TODO: change this to upstream once merged https://github.com/ziglibs/zlm/pull/33
+            .url = "git+https://github.com/theMagicalKarp/zlm?ref=fix-format#2587468c37d50732f086dec2ec690e72aa26a19b",
+            .hash = "zlm-0.1.0-LoZ6yOquAADMCJBFg5QNcgBIcj1cXrLAzkAp5x2sDNS1",
+        },
+        .vaxis = .{
+            .url = "git+https://github.com/rockorager/libvaxis.git#7dbb9fd3122e4ffad262dd7c151d80d863b68558",
+            .hash = "vaxis-0.5.1-BWNV_LosCQAGmCCNOLljCIw6j6-yt53tji6n6rwJ2BhS",
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",
