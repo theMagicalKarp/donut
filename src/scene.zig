@@ -55,7 +55,12 @@ pub fn Scene(comptime T: type) type {
                 math.vec2(self.dimensionsf.x, self.dimensionsf.y),
             ).div(math.vec2(self.dimensionsf.y, self.dimensionsf.y));
 
-            const ray_direction = get_ray_direction(uv, ray_origin, math.vec3(0.0, 0.0, 0.0), 1.0);
+            const ray_direction = get_ray_direction(
+                uv,
+                ray_origin,
+                math.vec3(0.0, 0.0, 0.0),
+                1.0,
+            );
             var total_distance: f64 = 0.0;
             for (0..80) |i| {
                 _ = i;
@@ -64,14 +69,26 @@ pub fn Scene(comptime T: type) type {
                 const distance: f64 = @abs(map(time, point, geometry));
                 total_distance = total_distance + distance;
                 if (distance < self.surface_distance) {
-                    return HitRecord{ .hit = true, .normal = get_normal(time, point, geometry) };
+                    return HitRecord{
+                        .hit = true,
+                        .normal = get_normal(time, point, geometry),
+                        .distance = total_distance,
+                    };
                 }
 
                 if (total_distance > self.max_distance) {
-                    return HitRecord{ .hit = false, .normal = math.Vec3.zero };
+                    return HitRecord{
+                        .hit = false,
+                        .normal = math.Vec3.zero,
+                        .distance = 0.0,
+                    };
                 }
             }
-            return HitRecord{ .hit = false, .normal = math.Vec3.zero };
+            return HitRecord{
+                .hit = false,
+                .normal = math.Vec3.zero,
+                .distance = 0.0,
+            };
         }
 
         pub fn get_normal(time: f64, point: math.Vec3, geometry: T) math.Vec3 {

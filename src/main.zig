@@ -4,14 +4,7 @@ const math = @import("zlm").as(f64);
 const math_usize = @import("zlm").as(usize);
 
 const Shading = @import("./shading.zig").Shading;
-
 const Scene = @import("./scene.zig").Scene;
-const Rotate = @import("./geometry/rotate.zig").Rotate;
-const Torus = @import("./geometry/torus.zig").Torus;
-const UnionSmooth = @import("./geometry/union_smooth.zig").UnionSmooth;
-const Sphere = @import("./geometry/sphere.zig").Sphere;
-const Scale = @import("./geometry/scale.zig").Scale;
-
 const Geometry = @import("./geometry/geometry.zig").Geometry;
 
 const Event = union(enum) {
@@ -46,16 +39,32 @@ pub fn main() !void {
     const gamma: f32 = 2.4;
     const light_position = math.vec3(1.0, -1.0, -1.0).normalize();
 
-    const t1 = Geometry{ .torus = .{ .inner = 0.2, .outer = 1.0 } };
-    const rt1 = Geometry{ .rotate = Rotate.new(&t1, math.vec3(0.0, 0.0, 1.0), 90.0) };
-    const t2 = Geometry{ .torus = .{ .inner = 0.2, .outer = 1.0 } };
-    const t3 = Geometry{ .union_smooth = .{ .a = &rt1, .b = &t2, .smooth = 0.3 } };
-    const st3 = Geometry{ .scale = .{ .geometry = &t3, .amount = 1.2 } };
+    const donut = Geometry{ .torus = .{
+        .inner = 0.2,
+        .outer = 1.0,
+    } };
+    const donut2 = Geometry{ .rotatez = .{ .geometry = &donut, .angle = 45.0 } };
+
+    const box = Geometry{ .box = .{ .dimensions = math.vec3(0.5, 0.5, 0.5) } };
+    _ = box;
+
+    const repeat = Geometry{
+        .repeat = .{ .geometry = &donut, .spacing = 3.0 },
+    };
+    _ = repeat;
+
+    const g = donut2;
 
     const GeometryScene = Scene(Geometry);
     const shading = Shading.new(light_position, gamma);
 
     var some_scene: ?GeometryScene = null;
+
+    const cam_right = math.vec3(1.0, 0.0, 0.0);
+    const cam_up = math.vec3(0.0, 1.0, 0.0);
+    var t: f64 = 0.0;
+    var roty: f64 = 0.0;
+    var rotx: f64 = 0.0;
 
     while (true) {
         while (loop.tryEvent()) |event| {
@@ -65,16 +74,29 @@ pub fn main() !void {
                         return;
                     } else if (key.matches('q', .{})) {
                         return;
+                    } else if (key.matches('a', .{})) {
+                        roty = roty + 0.05;
+                    } else if (key.matches('d', .{})) {
+                        roty = roty - 0.05;
+                    } else if (key.matches('w', .{})) {
+                        rotx = rotx + 0.05;
+                    } else if (key.matches('s', .{})) {
+                        rotx = rotx - 0.05;
                     }
                 },
 
                 .winsize => |ws| {
                     try vx.resize(allocator, tty.writer(), ws);
-                    some_scene = GeometryScene.new(math_usize.vec2(ws.cols - 2, ws.rows - 2), shading);
+                    some_scene = GeometryScene.new(
+                        math_usize.vec2(ws.cols - 2, ws.rows - 2),
+                        shading,
+                    );
                 },
                 else => {},
             }
         }
+
+        t = t + 0.1;
 
         const win = vx.window();
         win.clear();
@@ -93,9 +115,30 @@ pub fn main() !void {
         });
 
         screen_buffer.clearRetainingCapacity();
+
         if (some_scene) |scene| {
-            try scene.render(0.0, st3, &screen_buffer.writer);
-            _ = child.printSegment(.{ .text = screen_buffer.written() }, .{ .wrap = .grapheme });
+            const rot_y = math.Mat4.createAngleAxis(cam_up, roty);
+            const rot_x = math.Mat4.createAngleAxis(cam_right, rotx);
+            const rot_cam_rel = rot_y.mul(rot_x);
+
+            // Apply rotation to geometry
+            const rotated = Geometry{
+                .transform = .{
+                    .geometry = &g,
+                    .matrix = rot_cam_rel.transpose(),
+                },
+            };
+
+            try scene.render(
+                t,
+                rotated,
+                &screen_buffer.writer,
+            );
+
+            _ = child.printSegment(
+                .{ .text = screen_buffer.written() },
+                .{ .wrap = .grapheme },
+            );
         }
 
         try vx.render(tty.writer());
