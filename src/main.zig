@@ -1,6 +1,9 @@
 const std = @import("std");
 const vaxis = @import("vaxis");
 const math = @import("zlm").as(f64);
+const math_usize = @import("zlm").as(usize);
+
+const Shading = @import("./shading.zig").Shading;
 
 const Scene = @import("./scene.zig").Scene;
 const Rotate = @import("./geometry/rotate.zig").Rotate;
@@ -48,7 +51,10 @@ pub fn main() !void {
     const st3 = Scale(UnionSmooth(Rotate(Torus), Torus)).new(t3, 1.2);
 
     const ThisScene = Scene(Scale(UnionSmooth(Rotate(Torus), Torus)));
-    var scene = ThisScene.new(200.0, 200.0, light_position, gamma);
+
+    const shading = Shading.new(light_position, gamma);
+
+    var scene = ThisScene.new(math_usize.vec2(200, 200), shading);
 
     while (true) {
         while (loop.tryEvent()) |event| {
@@ -63,8 +69,7 @@ pub fn main() !void {
 
                 .winsize => |ws| {
                     try vx.resize(allocator, tty.writer(), ws);
-
-                    scene = ThisScene.new(ws.cols - 2, ws.rows - 2, light_position, gamma);
+                    scene = ThisScene.new(math_usize.vec2(ws.cols - 2, ws.rows - 2), shading);
                 },
                 else => {},
             }

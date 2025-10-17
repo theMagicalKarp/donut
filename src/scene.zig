@@ -1,45 +1,9 @@
 const std = @import("std");
 const math = @import("zlm").as(f64);
+const math_usize = @import("zlm").as(usize);
 
-const LUMINANCE = ".,-~:;=!*#$@";
-
-fn bayer4(x: usize, y: usize) u8 {
-    const M = [_][4]u8{
-        .{ 0, 8, 2, 10 },
-        .{ 12, 4, 14, 6 },
-        .{ 3, 11, 1, 9 },
-        .{ 15, 7, 13, 5 },
-    };
-    return M[y & 3][x & 3];
-}
-
-fn brightnessToCharDither(x: usize, y: usize, b_in: f64, gamma: f64) u8 {
-    const lut = LUMINANCE;
-    const levels_f: f32 = @floatFromInt(lut.len);
-
-    // 1) Clamp + gamma (linear -> perceptual)
-    const b = std.math.clamp(b_in, 0.0, 1.0);
-    const g = if (gamma <= 0.0) 1.0 else gamma;
-    const b_perc = std.math.pow(f64, b, 1.0 / g);
-
-    // 2) Ordered dithering bias from Bayer (normalize to [0,1))
-    //    Add a *tiny* offset proportional to matrix cell; scale by level count.
-    const b4f: f64 = @floatFromInt(bayer4(x, y));
-    const t = (b4f + 0.5) / 16.0; // [0,1)
-    const bias = (t - 0.5) / levels_f; // small symmetric nudge
-
-    // 3) Quantize to nearest glyph index (rounded)
-    const v = std.math.clamp(b_perc + bias, 0.0, 1.0);
-    var idx: u8 = @intFromFloat(v * (levels_f - 1.0) + 0.5);
-    if (idx >= lut.len) idx = lut.len - 1;
-
-    return lut[idx];
-}
-
-const HitRecord = struct {
-    normal: math.Vec3,
-    hit: bool,
-};
+const HitRecord = @import("./hit.zig").HitRecord;
+const Shading = @import("./shading.zig").Shading;
 
 pub fn get_ray_direction(uv: math.Vec2, point: math.Vec3, lookat: math.Vec3, z: f64) math.Vec3 {
     const f = lookat.sub(point).normalize();
@@ -54,38 +18,26 @@ pub fn Scene(comptime T: type) type {
     return struct {
         const Self = @This();
 
-        light: math.Vec3,
-        gamma: f64,
+        shading: Shading,
 
-        width: usize,
-        height: usize,
+        dimensions: math_usize.Vec2,
+        dimensionsf: math.Vec2,
 
-        widthf: f64,
-        heightf: f64,
-
-        pub fn new(width: usize, height: usize, light: math.Vec3, gamma: f64) Self {
+        pub fn new(dimensions: math_usize.Vec2, shading: Shading) Self {
             return Self{
-                .width = width,
-                .height = height,
-                .light = light,
-                .widthf = @floatFromInt(width),
-                .heightf = @floatFromInt(height),
-                .gamma = gamma,
+                .dimensions = dimensions,
+                .shading = shading,
+                .dimensionsf = math.vec2(@floatFromInt(dimensions.x), @floatFromInt(dimensions.y)),
             };
         }
 
         pub fn render(self: Self, time: f64, geometry: T, writer: *std.Io.Writer) !void {
-            for (0..self.height) |y| {
-                for (0..self.width) |x| {
+            for (0..self.dimensions.y) |y| {
+                for (0..self.dimensions.x) |x| {
                     const xf: f64 = @floatFromInt(x);
                     const yf: f64 = @floatFromInt(y);
                     const hit_record = self.march(time, geometry, xf, yf);
-                    if (hit_record.hit) {
-                        const brightness = @max(0.0, hit_record.normal.normalize().dot(self.light));
-                        try writer.writeByte(brightnessToCharDither(x, y, brightness, self.gamma));
-                    } else {
-                        try writer.writeByte(' ');
-                    }
+                    try writer.writeByte(self.shading.calculate(math_usize.vec2(x, y), hit_record));
                 }
             }
         }
@@ -94,7 +46,9 @@ pub fn Scene(comptime T: type) type {
             const ray_origin = math.vec3(0.0, 0.0, -2.0);
 
             const frag_coord = math.vec4(x + 0.5, y + 0.5, 0.0, 1.0);
-            const uv = frag_coord.scale(2.0).swizzle("xy").sub(math.vec2(self.widthf, self.heightf)).div(math.vec2(self.heightf, self.heightf));
+            const uv = frag_coord.scale(2.0).swizzle("xy").sub(
+                math.vec2(self.dimensionsf.x, self.dimensionsf.y),
+            ).div(math.vec2(self.dimensionsf.y, self.dimensionsf.y));
 
             const ray_direction = get_ray_direction(uv, ray_origin, math.vec3(0.0, 0.0, 0.0), 1.0);
             var total_distance: f64 = 0.0;
