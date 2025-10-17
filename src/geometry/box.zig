@@ -1,7 +1,7 @@
 const math = @import("zlm").as(f64);
 
-pub const Octahedron = struct {
-    dimensions: math.vec3,
+pub const Box = struct {
+    dimensions: math.Vec3,
 
     const Self = @This();
 

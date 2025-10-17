@@ -23,10 +23,15 @@ pub fn Scene(comptime T: type) type {
         dimensions: math_usize.Vec2,
         dimensionsf: math.Vec2,
 
+        max_distance: f64,
+        surface_distance: f64,
+
         pub fn new(dimensions: math_usize.Vec2, shading: Shading) Self {
             return Self{
                 .dimensions = dimensions,
                 .shading = shading,
+                .max_distance = 100.0,
+                .surface_distance = 0.01,
                 .dimensionsf = math.vec2(@floatFromInt(dimensions.x), @floatFromInt(dimensions.y)),
             };
         }
@@ -58,11 +63,11 @@ pub fn Scene(comptime T: type) type {
 
                 const distance: f64 = @abs(map(time, point, geometry));
                 total_distance = total_distance + distance;
-                if (distance < 0.01) {
+                if (distance < self.surface_distance) {
                     return HitRecord{ .hit = true, .normal = get_normal(time, point, geometry) };
                 }
 
-                if (total_distance > 100.0) {
+                if (total_distance > self.max_distance) {
                     return HitRecord{ .hit = false, .normal = math.Vec3.zero };
                 }
             }

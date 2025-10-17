@@ -1,18 +1,13 @@
 const math = @import("zlm").as(f64);
+const Geometry = @import("geometry.zig").Geometry;
 
-pub fn Subtraction(comptime T: type, comptime U: type) type {
-    return struct {
-        a: T,
-        b: U,
+pub const Subtraction = struct {
+    a: *const Geometry,
+    b: *const Geometry,
 
-        const Self = @This();
+    const Self = @This();
 
-        pub fn new(a: T, b: U) Self {
-            return Self{ .a = a, .b = b };
-        }
-
-        pub fn distance(self: Self, point: math.Vec3) f64 {
-            return @max(-self.a.distance(point), self.b.distance(point));
-        }
-    };
-}
+    pub fn distance(self: Self, point: math.Vec3) f64 {
+        return @max(-self.a.distance(point), self.b.distance(point));
+    }
+};
