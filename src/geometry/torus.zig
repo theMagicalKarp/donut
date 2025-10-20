@@ -6,7 +6,8 @@ pub const Torus = struct {
 
     const Self = @This();
 
-    pub fn distance(self: Self, point: math.Vec3) f64 {
+    pub fn distance(self: Self, time: f64, point: math.Vec3) f64 {
+        _ = time;
         var q = math.vec2(point.swizzle("xz").length() - self.outer, point.y);
         return q.length() - self.inner;
     }

@@ -27,7 +27,7 @@ pub const Shading = struct {
             .gamma = gamma,
             .lut = ".,-~:;=!*#$@",
             .fog_brightness = 0.00,
-            .fog_density = 0.05,
+            .fog_density = 0.023,
         };
     }
 

@@ -7,7 +7,7 @@ pub const Scale = struct {
 
     const Self = @This();
 
-    pub fn distance(self: Self, point: math.Vec3) f64 {
-        return self.geometry.distance(point.scale(1.0 / self.amount)) * self.amount;
+    pub fn distance(self: Self, time: f64, point: math.Vec3) f64 {
+        return self.geometry.distance(time, point.scale(1.0 / self.amount)) * self.amount;
     }
 };

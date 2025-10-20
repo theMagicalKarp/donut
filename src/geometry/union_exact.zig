@@ -7,7 +7,7 @@ pub const UnionExact = struct {
 
     const Self = @This();
 
-    pub fn distance(self: Self, point: math.Vec3) f64 {
-        return @min(self.a.distance(point), self.b.distance(point));
+    pub fn distance(self: Self, time: f64, point: math.Vec3) f64 {
+        return @min(self.a.distance(time, point), self.b.distance(time, point));
     }
 };
