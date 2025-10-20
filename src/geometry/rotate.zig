@@ -18,9 +18,26 @@ pub const RotateX = struct {
 
     const Self = @This();
 
-    pub fn distance(self: Self, point: math.Vec3) f64 {
+    pub fn distance(self: Self, time: f64, point: math.Vec3) f64 {
         const transformation = point.swizzle("yz").transform(rotate_2d(self.angle));
         return self.geometry.distance(
+            time,
+            math.vec3(point.x, transformation.x, transformation.y),
+        );
+    }
+};
+
+pub const SpinX = struct {
+    rate: f64,
+    geometry: *const Geometry,
+
+    const Self = @This();
+
+    pub fn distance(self: Self, time: f64, point: math.Vec3) f64 {
+        const angle = time * self.rate;
+        const transformation = point.swizzle("yz").transform(rotate_2d(angle));
+        return self.geometry.distance(
+            time,
             math.vec3(point.x, transformation.x, transformation.y),
         );
     }
@@ -28,13 +45,31 @@ pub const RotateX = struct {
 
 pub const RotateY = struct {
     angle: f64,
+    rate: f64,
     geometry: *const Geometry,
 
     const Self = @This();
 
-    pub fn distance(self: Self, point: math.Vec3) f64 {
+    pub fn distance(self: Self, time: f64, point: math.Vec3) f64 {
         const transformation = point.swizzle("xz").transform(rotate_2d(self.angle));
         return self.geometry.distance(
+            time,
+            math.vec3(transformation.x, point.y, transformation.y),
+        );
+    }
+};
+
+pub const SpinY = struct {
+    rate: f64,
+    geometry: *const Geometry,
+
+    const Self = @This();
+
+    pub fn distance(self: Self, time: f64, point: math.Vec3) f64 {
+        const angle = time * self.rate;
+        const transformation = point.swizzle("xz").transform(rotate_2d(angle));
+        return self.geometry.distance(
+            time,
             math.vec3(transformation.x, point.y, transformation.y),
         );
     }
@@ -46,9 +81,26 @@ pub const RotateZ = struct {
 
     const Self = @This();
 
-    pub fn distance(self: Self, point: math.Vec3) f64 {
+    pub fn distance(self: Self, time: f64, point: math.Vec3) f64 {
         const transformation = point.swizzle("xy").transform(rotate_2d(self.angle));
         return self.geometry.distance(
+            time,
+            math.vec3(transformation.x, transformation.y, point.z),
+        );
+    }
+};
+
+pub const SpinZ = struct {
+    rate: f64,
+    geometry: *const Geometry,
+
+    const Self = @This();
+
+    pub fn distance(self: Self, time: f64, point: math.Vec3) f64 {
+        const angle = time * self.rate;
+        const transformation = point.swizzle("xy").transform(rotate_2d(angle));
+        return self.geometry.distance(
+            time,
             math.vec3(transformation.x, transformation.y, point.z),
         );
     }

@@ -13,9 +13,9 @@ pub const UnionSmooth = struct {
 
     const Self = @This();
 
-    pub fn distance(self: Self, point: math.Vec3) f64 {
-        const d1 = self.a.distance(point);
-        const d2 = self.b.distance(point);
+    pub fn distance(self: Self, time: f64, point: math.Vec3) f64 {
+        const d1 = self.a.distance(time, point);
+        const d2 = self.b.distance(time, point);
 
         const h = std.math.clamp(0.5 + 0.5 * (d2 - d1) / self.smooth, 0.0, 1.0);
 

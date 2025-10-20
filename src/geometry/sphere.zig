@@ -5,7 +5,8 @@ pub const Sphere = struct {
 
     const Self = @This();
 
-    pub fn distance(self: Self, point: math.Vec3) f64 {
+    pub fn distance(self: Self, time: f64, point: math.Vec3) f64 {
+        _ = time;
         return point.length() - self.radius;
     }
 };

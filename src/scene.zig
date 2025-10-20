@@ -2,6 +2,7 @@ const std = @import("std");
 const math = @import("zlm").as(f64);
 const math_usize = @import("zlm").as(usize);
 
+const Camera = @import("./camera.zig").Camera;
 const HitRecord = @import("./hit.zig").HitRecord;
 const Shading = @import("./shading.zig").Shading;
 
@@ -20,51 +21,51 @@ pub fn Scene(comptime T: type) type {
 
         shading: Shading,
 
-        dimensions: math_usize.Vec2,
-        dimensionsf: math.Vec2,
-
+        max_steps: usize,
         max_distance: f64,
         surface_distance: f64,
 
-        pub fn new(dimensions: math_usize.Vec2, shading: Shading) Self {
+        pub fn new(shading: Shading) Self {
             return Self{
-                .dimensions = dimensions,
                 .shading = shading,
                 .max_distance = 100.0,
                 .surface_distance = 0.01,
-                .dimensionsf = math.vec2(@floatFromInt(dimensions.x), @floatFromInt(dimensions.y)),
+                .max_steps = 80,
             };
         }
 
-        pub fn render(self: Self, time: f64, geometry: T, writer: *std.Io.Writer) !void {
-            for (0..self.dimensions.y) |y| {
-                for (0..self.dimensions.x) |x| {
+        pub fn render(self: Self, time: f64, camera: Camera, geometry: T, writer: *std.Io.Writer) !void {
+            for (0..camera.resolution.y) |y| {
+                for (0..camera.resolution.x) |x| {
                     const xf: f64 = @floatFromInt(x);
                     const yf: f64 = @floatFromInt(y);
-                    const hit_record = self.march(time, geometry, xf, yf);
+                    const hit_record = self.march(time, camera, geometry, xf, yf);
                     try writer.writeByte(self.shading.calculate(math_usize.vec2(x, y), hit_record));
                 }
             }
         }
 
-        pub fn march(self: Self, time: f64, geometry: T, x: f64, y: f64) HitRecord {
-            const ray_origin = math.vec3(0.0, 0.0, -2.0);
+        pub fn march(self: Self, time: f64, camera: Camera, geometry: T, x: f64, y: f64) HitRecord {
+            const resolution = math.vec2(
+                @floatFromInt(camera.resolution.x),
+                @floatFromInt(camera.resolution.y),
+            );
 
             const frag_coord = math.vec4(x + 0.5, y + 0.5, 0.0, 1.0);
             const uv = frag_coord.scale(2.0).swizzle("xy").sub(
-                math.vec2(self.dimensionsf.x, self.dimensionsf.y),
-            ).div(math.vec2(self.dimensionsf.y, self.dimensionsf.y));
+                resolution,
+            ).div(math.vec2(resolution.y, resolution.y));
 
             const ray_direction = get_ray_direction(
                 uv,
-                ray_origin,
-                math.vec3(0.0, 0.0, 0.0),
+                camera.position,
+                camera.look_at,
                 1.0,
             );
             var total_distance: f64 = 0.0;
-            for (0..80) |i| {
+            for (0..self.max_steps) |i| {
                 _ = i;
-                const point = ray_origin.add(ray_direction.scale(total_distance));
+                const point = camera.position.add(ray_direction.scale(total_distance));
 
                 const distance: f64 = @abs(map(time, point, geometry));
                 total_distance = total_distance + distance;
@@ -103,8 +104,7 @@ pub fn Scene(comptime T: type) type {
         }
 
         pub fn map(time: f64, point: math.Vec3, geometry: T) f64 {
-            _ = time;
-            return geometry.distance(point);
+            return geometry.distance(time, point);
         }
     };
 }
