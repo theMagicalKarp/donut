@@ -2,6 +2,7 @@ const std = @import("std");
 const vaxis = @import("vaxis");
 const math = @import("zlm").as(f64);
 const math_usize = @import("zlm").as(usize);
+const donut = @import("donut");
 
 const Shading = @import("./shading.zig").Shading;
 const Scene = @import("./scene.zig").Scene;
@@ -22,6 +23,9 @@ pub fn main() !void {
 
     var fps_buffer = std.io.Writer.Allocating.init(allocator);
     defer fps_buffer.deinit();
+
+    var position_buffer = std.io.Writer.Allocating.init(allocator);
+    defer position_buffer.deinit();
 
     var scene_buffer = std.io.Writer.Allocating.init(allocator);
     defer scene_buffer.deinit();
@@ -79,49 +83,41 @@ pub fn main() !void {
         },
     };
 
-    const donut = Geometry{ .torus = .{
-        .inner = 0.2,
-        .outer = 1.0,
-    } };
-
-    // const repeat = Geometry{
-    //     .repeat = .{ .geometry = &box, .spacing = 2.0 },
-    // };
-
-    const bounce = Geometry{ .lerp = .{
-        .geometry = &donut,
-        .start = math.vec3(0.0, 0.0, 1.0),
-        .stop = math.vec3(0.0, 0.0, -1.0),
-        .time_scale = 2000.0,
-        .ease = .smoother,
-        .mode = .ping_pong,
-    } };
-
-    // _ = box;
-    // _ = repeat;
-    // _ = donut;
-    _ = bounce;
-
-    // const g = repeat;
-    // const g = bouncing_sphere;
-    // const g = g1;
     const g = g1;
 
-    const GeometryScene = Scene(Geometry);
-    const shading = Shading.new(light_position, gamma);
-    const scene = GeometryScene.new(shading);
+    const scene = Scene(Geometry).new(
+        Shading.new(light_position, gamma),
+    );
 
     var paused: bool = false;
-    var camera_distance: f64 = 2.0;
-    var camera_theta: f64 = 0.0;
-    var camera_phi: f64 = 1.57;
+    var camera_distance = donut.Interval(f64){
+        .current = 2.0,
+        .default = 2.0,
+        .min = 0.1,
+        .max = 10.0,
+        .step = 0.1,
+    };
+    var camera_theta = donut.Interval(f64){
+        .current = 0.0,
+        .default = 0.0,
+        .min = -std.math.floatMax(f64),
+        .max = std.math.floatMax(f64),
+        .step = 0.1,
+    };
+    var camera_phi = donut.Interval(f64){
+        .current = 1.57,
+        .default = 1.57,
+        .min = 0.1,
+        .max = 3.04,
+        .step = 0.1,
+    };
 
     var camera = Camera{
         .position = Camera.orbit(
             math.vec3(0.0, 0.0, 0.0),
-            camera_distance,
-            camera_theta,
-            camera_phi,
+            camera_distance.current,
+            camera_theta.current,
+            camera_phi.current,
         ),
         .resolution = math_usize.vec2(0, 0),
         .look_at = math.vec3(0.0, 0.0, 0.0),
@@ -140,66 +136,60 @@ pub fn main() !void {
                     } else if (key.matches('q', .{})) {
                         return;
                     } else if (key.matches('a', .{})) {
-                        camera_theta = camera_theta + 0.05;
                         camera.position = Camera.orbit(
                             camera.look_at,
-                            camera_distance,
-                            camera_theta,
-                            camera_phi,
+                            camera_distance.current,
+                            camera_theta.increment(),
+                            camera_phi.current,
                         );
                     } else if (key.matches('d', .{})) {
-                        camera_theta = camera_theta - 0.05;
-
                         camera.position = Camera.orbit(
                             camera.look_at,
-                            camera_distance,
-                            camera_theta,
-                            camera_phi,
+                            camera_distance.current,
+                            camera_theta.decrement(),
+                            camera_phi.current,
                         );
                     } else if (key.matches('w', .{})) {
-                        camera_phi = std.math.clamp(camera_phi - 0.05, 0.1, 3.04);
                         camera.position = Camera.orbit(
                             camera.look_at,
-                            camera_distance,
-                            camera_theta,
-                            camera_phi,
+                            camera_distance.current,
+                            camera_theta.current,
+                            camera_phi.decrement(),
                         );
                     } else if (key.matches('s', .{})) {
-                        camera_phi = std.math.clamp(camera_phi + 0.05, 0.1, 3.04);
                         camera.position = Camera.orbit(
                             camera.look_at,
-                            camera_distance,
-                            camera_theta,
-                            camera_phi,
+                            camera_distance.current,
+                            camera_theta.current,
+                            camera_phi.increment(),
                         );
                     } else if (key.matches('r', .{})) {
-                        camera_distance = 2.0;
-                        camera_theta = 0.0;
-                        camera_phi = 1.57;
+                        paused = false;
+                        camera_distance.reset();
+                        camera_theta.reset();
+                        camera_phi.reset();
                         camera.position = Camera.orbit(
                             camera.look_at,
-                            camera_distance,
-                            camera_theta,
-                            camera_phi,
+                            camera_distance.current,
+                            camera_theta.current,
+                            camera_phi.current,
                         );
                     } else if (key.matches('z', .{ .shift = false })) {
-                        camera_distance = camera_distance - 0.05;
                         camera.position = Camera.orbit(
                             camera.look_at,
-                            camera_distance,
-                            camera_theta,
-                            camera_phi,
+                            camera_distance.decrement(),
+                            camera_theta.current,
+                            camera_phi.current,
+                        );
+                    } else if (key.matches('z', .{ .shift = true })) {
+                        camera.position = Camera.orbit(
+                            camera.look_at,
+                            camera_distance.increment(),
+                            camera_theta.current,
+                            camera_phi.current,
                         );
                     } else if (key.matches(' ', .{})) {
                         paused = !paused;
-                    } else if (key.matches('z', .{ .shift = true })) {
-                        camera_distance = camera_distance + 0.05;
-                        camera.position = Camera.orbit(
-                            camera.look_at,
-                            camera_distance,
-                            camera_theta,
-                            camera_phi,
-                        );
                     }
                 },
 
@@ -235,9 +225,9 @@ pub fn main() !void {
             .width = 25,
             .height = 1,
         }).printSegment(
-            .{ .text = " demo ", .style = .{
+            .{ .text = "(demo)", .style = .{
                 .bold = true,
-                .fg = .{ .index = 4 },
+                .fg = .{ .index = 5 },
             } },
             .{ .wrap = .grapheme },
         );
@@ -245,16 +235,17 @@ pub fn main() !void {
         try render_x_scroll(
             win,
             &scroll_buffer_x,
-            @mod(std.math.pi - camera_theta, std.math.tau) / std.math.tau,
+            @mod(std.math.pi - camera_theta.current, std.math.tau) / std.math.tau,
         );
 
         try render_y_scroll(
             win,
             &scroll_buffer_y,
-            @mod(camera_phi - 0.1, 3.04) / 3.04,
+            @mod(camera_phi.current - 0.1, 3.04) / 3.04,
         );
 
         try render_fps(win, &fps_buffer, frame_sync);
+        try render_position(win, &position_buffer, camera, camera_distance.current);
 
         try vx.render(tty.writer());
         frame_sync.end();
@@ -291,12 +282,39 @@ fn render_scene(win: vaxis.Window, buffer: *std.io.Writer.Allocating, scene: Sce
 
 fn render_fps(win: vaxis.Window, buffer: *std.io.Writer.Allocating, frame_sync: FrameSync) !void {
     buffer.clearRetainingCapacity();
-    try buffer.writer.print("FPS: {d:.2}\n", .{frame_sync.measured_fps});
+    try buffer.writer.print("FPS: {d:.2}\n", .{frame_sync.fps});
 
     _ = win.child(.{
         .x_off = 4,
         .y_off = win.height - 1,
         .width = 16,
+        .height = 1,
+    }).printSegment(
+        .{ .text = buffer.written(), .style = .{
+            .bold = true,
+            .fg = .{ .index = 5 },
+        } },
+        .{ .wrap = .grapheme },
+    );
+}
+
+fn render_position(win: vaxis.Window, buffer: *std.io.Writer.Allocating, camera: Camera, zoom: f64) !void {
+    buffer.clearRetainingCapacity();
+
+    try buffer.writer.print(
+        "Camera({d:>5.2},{d:>5.2},{d:>5.2},{d:>5.2})",
+        .{
+            camera.position.x,
+            camera.position.y,
+            camera.position.z,
+            zoom,
+        },
+    );
+
+    _ = win.child(.{
+        .x_off = 20,
+        .y_off = win.height - 1,
+        .width = 42,
         .height = 1,
     }).printSegment(
         .{ .text = buffer.written(), .style = .{
