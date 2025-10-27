@@ -54,36 +54,80 @@ pub fn main() !void {
     const gamma: f32 = 2.4;
     const light_position = math.vec3(1.0, -1.0, -1.0).normalize();
 
-    const g1 = Geometry{
-        .union_smooth = .{
-            .a = &Geometry{
-                .lerp = .{
-                    .geometry = &Geometry{ .sphere = .{ .radius = 0.25 } },
-                    .start = math.vec3(0.0, 0.0, 3.0),
-                    .stop = math.vec3(0.0, 0.0, -3.0),
-                    .time_scale = 4000.0,
-                    .ease = .smoother,
-                    .mode = .ping_pong,
-                },
-            },
-            .b = &Geometry{
-                .spinx = .{
-                    .geometry = &Geometry{
-                        .spinz = .{
-                            .geometry = &Geometry{
-                                .box = .{ .dimensions = math.vec3(0.6, 0.6, 0.6) },
-                            },
-                            .rate = 0.001,
-                        },
+    var geometry_index: usize = 0;
+    const geometry: []const Geometry = &.{
+        .{
+            .spinx = .{
+                .geometry = &.{
+                    .spinz = .{
+                        .geometry = &.{ .BoxFrame = .{ .dimensions = math.vec3(0.5, 0.5, 0.5), .thickness = 0.1 } },
+                        .rate = 0.002,
                     },
-                    .rate = 0.001,
                 },
+                .rate = 0.001,
             },
-            .smooth = 2.0,
+        },
+        .{
+            .walk = .{
+                .geometry = &Geometry{
+                    .repeat = .{
+                        .geometry = &.{
+                            .spinx = .{
+                                .geometry = &Geometry{ .octahedron = .{ .size = 0.25 } },
+                                .rate = 0.001,
+                            },
+                        },
+                        .spacing = 1.0,
+                    },
+                },
+                .direction = math.vec3(0.00025, 0.0, 0.0),
+            },
+        },
+        .{
+            .spinx = .{
+                .geometry = &.{
+                    .spinz = .{
+                        .geometry = &Geometry{
+                            .translate = .{
+                                .geometry = &.{ .torus = .{ .inner = 0.45, .outer = 1.0 } },
+                                .direction = math.vec3(0.0, 0.05, 0.0),
+                            },
+                        },
+                        .rate = 0.002,
+                    },
+                },
+                .rate = 0.001,
+            },
+        },
+        .{
+            .union_smooth = .{
+                .a = &Geometry{
+                    .lerp = .{
+                        .geometry = &Geometry{ .sphere = .{ .radius = 0.25 } },
+                        .start = math.vec3(0.0, 0.0, 3.0),
+                        .stop = math.vec3(0.0, 0.0, -3.0),
+                        .time_scale = 4000.0,
+                        .ease = .smoother,
+                        .mode = .ping_pong,
+                    },
+                },
+                .b = &Geometry{
+                    .spinx = .{
+                        .geometry = &Geometry{
+                            .spinz = .{
+                                .geometry = &Geometry{
+                                    .box = .{ .dimensions = math.vec3(0.6, 0.6, 0.6) },
+                                },
+                                .rate = 0.001,
+                            },
+                        },
+                        .rate = 0.001,
+                    },
+                },
+                .smooth = 2.0,
+            },
         },
     };
-
-    const g = g1;
 
     const scene = Scene(Geometry).new(
         Shading.new(light_position, gamma),
@@ -190,6 +234,8 @@ pub fn main() !void {
                         );
                     } else if (key.matches(' ', .{})) {
                         paused = !paused;
+                    } else if (key.matches('t', .{})) {
+                        geometry_index = (geometry_index + 1) % geometry.len;
                     }
                 },
 
@@ -215,7 +261,7 @@ pub fn main() !void {
             &scene_buffer,
             scene,
             camera,
-            g,
+            geometry[geometry_index],
             @floatFromInt(total_time),
         );
 

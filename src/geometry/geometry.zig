@@ -1,6 +1,7 @@
 const math = @import("zlm").as(f64);
 
 const Box = @import("box.zig").Box;
+const BoxFrame = @import("box.zig").BoxFrame;
 const Intersection = @import("intersection.zig").Intersection;
 const Lerp = @import("lerp.zig").Lerp;
 const Octahedron = @import("octahedron.zig").Octahedron;
@@ -19,9 +20,11 @@ const Transform = @import("transform.zig").Transform;
 const Translate = @import("translate.zig").Translate;
 const UnionSmooth = @import("union_smooth.zig").UnionSmooth;
 const UnionExact = @import("union_exact.zig").UnionExact;
+const Walk = @import("translate.zig").Walk;
 
 pub const Geometry = union(enum) {
     box: Box,
+    BoxFrame: BoxFrame,
     intersection: Intersection,
     lerp: Lerp,
     octahedron: Octahedron,
@@ -40,6 +43,7 @@ pub const Geometry = union(enum) {
     translate: Translate,
     union_smooth: UnionSmooth,
     union_exact: UnionExact,
+    walk: Walk,
 
     const Self = @This();
 
