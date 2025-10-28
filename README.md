@@ -5,7 +5,7 @@ terminal, written in [Zig](https://ziglang.org/) and inspired by
 [akhileshthite/3d-donut](https://github.com/akhileshthite/3d-donut).
 
 <p align="center">
-  <img src="./docs/assets/example.gif" />
+  <img src="./docs/assets/donut.gif" />
 </p>
 
 ## ⚙️ Requirements
@@ -29,10 +29,18 @@ zig fmt .
 | :---------- | ------------------------: |
 | `wasd`      | obrit camera around scene |
 | `z`         |                      zoom |
+| `t`         |         toggle next scene |
 | `shift+z`   |                  zoom out |
 | `space-bar` |          pause animations |
 | `r`         |               reset scene |
 | `q`         |                      quit |
+
+## Other Examples
+
+<p align="center">
+  <img src="./docs/assets/morph.gif" />
+  <img src="./docs/assets/spinz.gif" />
+</p>
 
 # 📚 References
 

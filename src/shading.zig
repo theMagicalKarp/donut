@@ -18,27 +18,12 @@ pub const Shading = struct {
     gamma: f64,
     lut: []const u8,
 
-    fog_density: f64,
-    fog_brightness: f64,
-
     pub fn new(light: math.Vec3, gamma: f64) Self {
         return Self{
             .light = light,
             .gamma = gamma,
             .lut = ".,-~:;=!*#$@",
-            .fog_brightness = 0.00,
-            .fog_density = 0.023,
         };
-    }
-
-    fn fogFactor(self: Self, dist: f64) f64 {
-        if (self.fog_density <= 0.0) {
-            return 0.0;
-        }
-        const d = @max(dist, 0.0);
-        // Standard exponential fog. For denser close-range fog, use: exp(-density * d * d)
-
-        return 1.0 - @exp(-self.fog_density * d);
     }
 
     pub fn calculate(self: Self, pixel: math_usize.Vec2, hit_record: HitRecord) u8 {
@@ -48,12 +33,7 @@ pub const Shading = struct {
         const levels_f: f32 = @floatFromInt(self.lut.len);
         // --- Surface shading in linear space ---
         const n_dot_l: f64 = @max(0.0, hit_record.normal.normalize().dot(self.light));
-        var b_lin = std.math.clamp(n_dot_l, 0.0, 1.0);
-
-        // --- Fog blend in linear space ---
-        const dist: f64 = hit_record.distance;
-        const f = self.fogFactor(dist);
-        b_lin = b_lin * (1.0 - f) + self.fog_brightness * f;
+        const b_lin = std.math.clamp(n_dot_l, 0.0, 1.0);
 
         // --- Gamma to perceptual ---
         const b_perc = std.math.pow(f64, b_lin, 1.0 / self.gamma);
