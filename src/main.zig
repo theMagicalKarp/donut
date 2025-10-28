@@ -2,13 +2,8 @@ const std = @import("std");
 const vaxis = @import("vaxis");
 const math = @import("zlm").as(f64);
 const math_usize = @import("zlm").as(usize);
-const donut = @import("donut");
 
-const Shading = @import("./shading.zig").Shading;
-const Scene = @import("./scene.zig").Scene;
-const Camera = @import("./camera.zig").Camera;
-const Geometry = @import("./geometry/geometry.zig").Geometry;
-const FrameSync = @import("./frame_sync.zig").FrameSync;
+const donut = @import("donut");
 
 const Event = union(enum) {
     key_press: vaxis.Key,
@@ -21,6 +16,9 @@ pub fn main() !void {
     defer std.debug.assert(gpa.deinit() == .ok);
     const allocator = gpa.allocator();
 
+    var title_buffer = std.io.Writer.Allocating.init(allocator);
+    defer title_buffer.deinit();
+
     var fps_buffer = std.io.Writer.Allocating.init(allocator);
     defer fps_buffer.deinit();
 
@@ -29,12 +27,6 @@ pub fn main() !void {
 
     var scene_buffer = std.io.Writer.Allocating.init(allocator);
     defer scene_buffer.deinit();
-
-    var scroll_buffer_x = std.io.Writer.Allocating.init(allocator);
-    defer scroll_buffer_x.deinit();
-
-    var scroll_buffer_y = std.io.Writer.Allocating.init(allocator);
-    defer scroll_buffer_y.deinit();
 
     var tty_buffer: [1024]u8 = undefined;
     var tty = try vaxis.Tty.init(&tty_buffer);
@@ -55,39 +47,19 @@ pub fn main() !void {
     const light_position = math.vec3(1.0, -1.0, -1.0).normalize();
 
     var geometry_index: usize = 0;
-    const geometry: []const Geometry = &.{
+    const titles = [_][]const u8{
+        "Donut",
+        "Morph",
+        "The Spinz",
+        "Marching Octahedrons",
+    };
+
+    const geometry: []const donut.Geometry = &.{
         .{
             .spinx = .{
                 .geometry = &.{
                     .spinz = .{
-                        .geometry = &.{ .BoxFrame = .{ .dimensions = math.vec3(0.5, 0.5, 0.5), .thickness = 0.1 } },
-                        .rate = 0.002,
-                    },
-                },
-                .rate = 0.001,
-            },
-        },
-        .{
-            .walk = .{
-                .geometry = &Geometry{
-                    .repeat = .{
                         .geometry = &.{
-                            .spinx = .{
-                                .geometry = &Geometry{ .octahedron = .{ .size = 0.25 } },
-                                .rate = 0.001,
-                            },
-                        },
-                        .spacing = 1.0,
-                    },
-                },
-                .direction = math.vec3(0.00025, 0.0, 0.0),
-            },
-        },
-        .{
-            .spinx = .{
-                .geometry = &.{
-                    .spinz = .{
-                        .geometry = &Geometry{
                             .translate = .{
                                 .geometry = &.{ .torus = .{ .inner = 0.45, .outer = 1.0 } },
                                 .direction = math.vec3(0.0, 0.05, 0.0),
@@ -101,9 +73,9 @@ pub fn main() !void {
         },
         .{
             .union_smooth = .{
-                .a = &Geometry{
+                .a = &.{
                     .lerp = .{
-                        .geometry = &Geometry{ .sphere = .{ .radius = 0.25 } },
+                        .geometry = &.{ .sphere = .{ .radius = 0.25 } },
                         .start = math.vec3(0.0, 0.0, 3.0),
                         .stop = math.vec3(0.0, 0.0, -3.0),
                         .time_scale = 4000.0,
@@ -111,11 +83,11 @@ pub fn main() !void {
                         .mode = .ping_pong,
                     },
                 },
-                .b = &Geometry{
+                .b = &.{
                     .spinx = .{
-                        .geometry = &Geometry{
+                        .geometry = &.{
                             .spinz = .{
-                                .geometry = &Geometry{
+                                .geometry = &.{
                                     .box = .{ .dimensions = math.vec3(0.6, 0.6, 0.6) },
                                 },
                                 .rate = 0.001,
@@ -127,10 +99,114 @@ pub fn main() !void {
                 .smooth = 2.0,
             },
         },
+        .{
+            .union_exact = .{
+                .a = &.{
+                    .union_exact = .{
+                        .a = &.{
+                            .rotatex = .{
+                                .geometry = &.{
+                                    .spiny = .{
+                                        .geometry = &.{
+                                            .translate = .{
+                                                .geometry = &.{ .sphere = .{ .radius = 0.15 } },
+                                                .direction = math.vec3(0.0, 0.0, 1.5),
+                                            },
+                                        },
+                                        .rate = 0.0025,
+                                    },
+                                },
+                                .angle = 0.25,
+                            },
+                        },
+                        .b = &.{
+                            .time_offset = .{
+                                .geometry = &.{
+                                    .rotatex = .{
+                                        .geometry = &.{
+                                            .spiny = .{
+                                                .geometry = &.{
+                                                    .translate = .{
+                                                        .geometry = &.{ .sphere = .{ .radius = 0.15 } },
+                                                        .direction = math.vec3(0.0, 0.0, 1.5),
+                                                    },
+                                                },
+                                                .rate = 0.0025,
+                                            },
+                                        },
+                                        .angle = 45.0,
+                                    },
+                                },
+                                .duration = 1000.0,
+                            },
+                        },
+                    },
+                },
+                .b = &.{
+                    .union_exact = .{
+                        .a = &.{
+                            .time_offset = .{
+                                .geometry = &.{
+                                    .rotatex = .{
+                                        .geometry = &.{
+                                            .spiny = .{
+                                                .geometry = &.{
+                                                    .translate = .{
+                                                        .geometry = &.{ .sphere = .{ .radius = 0.15 } },
+                                                        .direction = math.vec3(0.0, 0.0, 1.5),
+                                                    },
+                                                },
+                                                .rate = 0.0025,
+                                            },
+                                        },
+                                        .angle = 90.0,
+                                    },
+                                },
+                                .duration = 1500.0,
+                            },
+                        },
+                        .b = &.{
+                            .spinx = .{
+                                .geometry = &.{
+                                    .spinz = .{
+                                        .geometry = &.{
+                                            .translate = .{
+                                                .geometry = &.{
+                                                    .box = .{ .dimensions = math.vec3(0.6, 0.6, 0.6) },
+                                                },
+                                                .direction = math.vec3(0.0, 0.05, 0.0),
+                                            },
+                                        },
+                                        .rate = 0.002,
+                                    },
+                                },
+                                .rate = 0.001,
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        .{
+            .walk = .{
+                .geometry = &.{
+                    .repeat = .{
+                        .geometry = &.{
+                            .spinx = .{
+                                .geometry = &.{ .octahedron = .{ .size = 0.25 } },
+                                .rate = 0.001,
+                            },
+                        },
+                        .spacing = 1.0,
+                    },
+                },
+                .direction = math.vec3(0.00025, 0.0, 0.0),
+            },
+        },
     };
 
-    const scene = Scene(Geometry).new(
-        Shading.new(light_position, gamma),
+    const scene = donut.Scene(donut.Geometry).new(
+        donut.Shading.new(light_position, gamma),
     );
 
     var paused: bool = false;
@@ -156,8 +232,8 @@ pub fn main() !void {
         .step = 0.1,
     };
 
-    var camera = Camera{
-        .position = Camera.orbit(
+    var camera = donut.Camera{
+        .position = donut.Camera.orbit(
             math.vec3(0.0, 0.0, 0.0),
             camera_distance.current,
             camera_theta.current,
@@ -168,7 +244,7 @@ pub fn main() !void {
     };
     var total_time: u64 = 0;
     var timer = try std.time.Timer.start();
-    var frame_sync = try FrameSync.new(30.0);
+    var frame_sync = try donut.FrameSync.new(30.0);
 
     while (true) {
         frame_sync.start();
@@ -180,28 +256,28 @@ pub fn main() !void {
                     } else if (key.matches('q', .{})) {
                         return;
                     } else if (key.matches('a', .{})) {
-                        camera.position = Camera.orbit(
+                        camera.position = donut.Camera.orbit(
                             camera.look_at,
                             camera_distance.current,
                             camera_theta.increment(),
                             camera_phi.current,
                         );
                     } else if (key.matches('d', .{})) {
-                        camera.position = Camera.orbit(
+                        camera.position = donut.Camera.orbit(
                             camera.look_at,
                             camera_distance.current,
                             camera_theta.decrement(),
                             camera_phi.current,
                         );
                     } else if (key.matches('w', .{})) {
-                        camera.position = Camera.orbit(
+                        camera.position = donut.Camera.orbit(
                             camera.look_at,
                             camera_distance.current,
                             camera_theta.current,
                             camera_phi.decrement(),
                         );
                     } else if (key.matches('s', .{})) {
-                        camera.position = Camera.orbit(
+                        camera.position = donut.Camera.orbit(
                             camera.look_at,
                             camera_distance.current,
                             camera_theta.current,
@@ -212,21 +288,21 @@ pub fn main() !void {
                         camera_distance.reset();
                         camera_theta.reset();
                         camera_phi.reset();
-                        camera.position = Camera.orbit(
+                        camera.position = donut.Camera.orbit(
                             camera.look_at,
                             camera_distance.current,
                             camera_theta.current,
                             camera_phi.current,
                         );
                     } else if (key.matches('z', .{ .shift = false })) {
-                        camera.position = Camera.orbit(
+                        camera.position = donut.Camera.orbit(
                             camera.look_at,
                             camera_distance.decrement(),
                             camera_theta.current,
                             camera_phi.current,
                         );
                     } else if (key.matches('z', .{ .shift = true })) {
-                        camera.position = Camera.orbit(
+                        camera.position = donut.Camera.orbit(
                             camera.look_at,
                             camera_distance.increment(),
                             camera_theta.current,
@@ -265,29 +341,20 @@ pub fn main() !void {
             @floatFromInt(total_time),
         );
 
+        const title = titles[geometry_index];
+        title_buffer.clearRetainingCapacity();
+        try title_buffer.writer.print("({s})", .{title});
         _ = win.child(.{
-            .x_off = win.width / 2 - 2,
+            .x_off = win.width / 2 - @as(u16, @intCast(title_buffer.written().len)) / 2,
             .y_off = 0,
             .width = 25,
             .height = 1,
         }).printSegment(
-            .{ .text = "(demo)", .style = .{
+            .{ .text = title_buffer.written(), .style = .{
                 .bold = true,
                 .fg = .{ .index = 5 },
             } },
             .{ .wrap = .grapheme },
-        );
-
-        try render_x_scroll(
-            win,
-            &scroll_buffer_x,
-            @mod(std.math.pi - camera_theta.current, std.math.tau) / std.math.tau,
-        );
-
-        try render_y_scroll(
-            win,
-            &scroll_buffer_y,
-            @mod(camera_phi.current - 0.1, 3.04) / 3.04,
         );
 
         try render_fps(win, &fps_buffer, frame_sync);
@@ -299,7 +366,7 @@ pub fn main() !void {
     }
 }
 
-fn render_scene(win: vaxis.Window, buffer: *std.io.Writer.Allocating, scene: Scene(Geometry), camera: Camera, geometry: Geometry, time: f64) !void {
+fn render_scene(win: vaxis.Window, buffer: *std.io.Writer.Allocating, scene: donut.Scene(donut.Geometry), camera: donut.Camera, geometry: donut.Geometry, time: f64) !void {
     buffer.clearRetainingCapacity();
 
     try scene.render(
@@ -326,7 +393,7 @@ fn render_scene(win: vaxis.Window, buffer: *std.io.Writer.Allocating, scene: Sce
     );
 }
 
-fn render_fps(win: vaxis.Window, buffer: *std.io.Writer.Allocating, frame_sync: FrameSync) !void {
+fn render_fps(win: vaxis.Window, buffer: *std.io.Writer.Allocating, frame_sync: donut.FrameSync) !void {
     buffer.clearRetainingCapacity();
     try buffer.writer.print("FPS: {d:.2}\n", .{frame_sync.fps});
 
@@ -344,7 +411,7 @@ fn render_fps(win: vaxis.Window, buffer: *std.io.Writer.Allocating, frame_sync: 
     );
 }
 
-fn render_position(win: vaxis.Window, buffer: *std.io.Writer.Allocating, camera: Camera, zoom: f64) !void {
+fn render_position(win: vaxis.Window, buffer: *std.io.Writer.Allocating, camera: donut.Camera, zoom: f64) !void {
     buffer.clearRetainingCapacity();
 
     try buffer.writer.print(
@@ -366,63 +433,6 @@ fn render_position(win: vaxis.Window, buffer: *std.io.Writer.Allocating, camera:
         .{ .text = buffer.written(), .style = .{
             .bold = true,
             .fg = .{ .index = 5 },
-        } },
-        .{ .wrap = .grapheme },
-    );
-}
-
-fn render_x_scroll(win: vaxis.Window, buffer: *std.io.Writer.Allocating, percentage: f64) !void {
-    buffer.clearRetainingCapacity();
-    const progress: i32 = @intFromFloat(
-        percentage * @as(f64, @floatFromInt(win.width - 2)),
-    );
-
-    for (0..win.width - 2) |i| {
-        if (i == progress) {
-            _ = try buffer.writer.write("▲");
-        } else {
-            _ = try buffer.writer.write(" ");
-        }
-    }
-
-    _ = win.child(.{
-        .x_off = 1,
-        .y_off = 1,
-        .width = win.width - 2,
-        .height = 1,
-    }).printSegment(
-        .{ .text = buffer.written(), .style = .{
-            .bold = true,
-            .fg = .{ .index = 4 },
-        } },
-        .{ .wrap = .grapheme },
-    );
-}
-
-fn render_y_scroll(win: vaxis.Window, buffer: *std.io.Writer.Allocating, percentage: f64) !void {
-    buffer.clearRetainingCapacity();
-
-    const progress: i32 = @intFromFloat(
-        percentage * @as(f64, @floatFromInt(win.height - 2)),
-    );
-
-    for (0..win.height - 2) |i| {
-        if (i == progress) {
-            _ = try buffer.writer.write("◀");
-        } else {
-            _ = try buffer.writer.write(" ");
-        }
-    }
-
-    _ = win.child(.{
-        .x_off = 1,
-        .y_off = 1,
-        .width = 1,
-        .height = win.height - 2,
-    }).printSegment(
-        .{ .text = buffer.written(), .style = .{
-            .bold = true,
-            .fg = .{ .index = 4 },
         } },
         .{ .wrap = .grapheme },
     );

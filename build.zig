@@ -26,6 +26,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    mod.addImport("zlm", zlm.module("zlm"));
     exe.root_module.addImport("zlm", zlm.module("zlm"));
 
     const vaxis = b.dependency("vaxis", .{

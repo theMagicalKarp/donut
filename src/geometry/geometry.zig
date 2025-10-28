@@ -15,6 +15,7 @@ const SpinX = @import("rotate.zig").SpinX;
 const SpinY = @import("rotate.zig").SpinY;
 const SpinZ = @import("rotate.zig").SpinZ;
 const Subtraction = @import("subtraction.zig").Subtraction;
+const TimeOffset = @import("time.zig").TimeOffset;
 const Torus = @import("torus.zig").Torus;
 const Transform = @import("transform.zig").Transform;
 const Translate = @import("translate.zig").Translate;
@@ -38,6 +39,7 @@ pub const Geometry = union(enum) {
     spiny: SpinY,
     spinz: SpinZ,
     subtraction: Subtraction,
+    time_offset: TimeOffset,
     torus: Torus,
     transform: Transform,
     translate: Translate,
