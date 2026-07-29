@@ -1,0 +1,26 @@
+[tools]
+zig = "0.16.0"
+
+[tasks.build]
+description = "Build the project"
+run = "zig build"
+
+[tasks.run]
+description = "Build and run the renderer"
+run = "zig build run"
+
+[tasks.test]
+description = "Run the test suite"
+run = "zig build test"
+
+[tasks.fmt]
+description = "Check formatting without writing changes"
+run = "zig fmt --check --exclude zig-pkg ."
+
+[tasks.fix]
+description = "Auto format all source files"
+run = "zig fmt --exclude zig-pkg ."
+
+[tasks.check]
+description = "Run everything CI runs"
+depends = ["test", "fmt"]
