@@ -5,43 +5,43 @@ const math_usize = @import("zlm").as(usize);
 
 const donut = @import("donut");
 
+const clock: std.Io.Clock = .awake;
+
 const Event = union(enum) {
     key_press: vaxis.Key,
     winsize: vaxis.Winsize,
     focus_in,
 };
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer std.debug.assert(gpa.deinit() == .ok);
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const allocator = init.gpa;
 
-    var title_buffer = std.io.Writer.Allocating.init(allocator);
+    var title_buffer = std.Io.Writer.Allocating.init(allocator);
     defer title_buffer.deinit();
 
-    var fps_buffer = std.io.Writer.Allocating.init(allocator);
+    var fps_buffer = std.Io.Writer.Allocating.init(allocator);
     defer fps_buffer.deinit();
 
-    var position_buffer = std.io.Writer.Allocating.init(allocator);
+    var position_buffer = std.Io.Writer.Allocating.init(allocator);
     defer position_buffer.deinit();
 
-    var scene_buffer = std.io.Writer.Allocating.init(allocator);
+    var scene_buffer = std.Io.Writer.Allocating.init(allocator);
     defer scene_buffer.deinit();
 
     var tty_buffer: [1024]u8 = undefined;
-    var tty = try vaxis.Tty.init(&tty_buffer);
+    var tty = try vaxis.Tty.init(io, &tty_buffer);
     defer tty.deinit();
 
-    var vx = try vaxis.init(allocator, .{});
+    var vx = try vaxis.init(io, allocator, init.environ_map, .{});
     defer vx.deinit(allocator, tty.writer());
 
-    var loop: vaxis.Loop(Event) = .{ .tty = &tty, .vaxis = &vx };
-    try loop.init();
+    var loop: vaxis.Loop(Event) = .init(io, &tty, &vx);
     try loop.start();
     defer loop.stop();
 
     try vx.enterAltScreen(tty.writer());
-    try vx.queryTerminal(tty.writer(), 1 * std.time.ns_per_s);
+    try vx.queryTerminal(tty.writer(), .fromSeconds(1));
 
     const gamma: f32 = 2.4;
     const light_position = math.vec3(1.0, -1.0, -1.0).normalize();
@@ -243,12 +243,12 @@ pub fn main() !void {
         .look_at = math.vec3(0.0, 0.0, 0.0),
     };
     var total_time: u64 = 0;
-    var timer = try std.time.Timer.start();
-    var frame_sync = try donut.FrameSync.new(30.0);
+    var last_tick = clock.now(io);
+    var frame_sync = donut.FrameSync.new(io, 30.0);
 
     while (true) {
         frame_sync.start();
-        while (loop.tryEvent()) |event| {
+        while (try loop.tryEvent()) |event| {
             switch (event) {
                 .key_press => |key| {
                     if (key.matches('c', .{ .ctrl = true })) {
@@ -326,11 +326,14 @@ pub fn main() !void {
         const win = vx.window();
         win.clear();
 
+        const tick = clock.now(io);
         if (!paused) {
-            total_time = total_time + timer.lap() / std.time.ns_per_ms;
-        } else {
-            timer.reset();
+            total_time = total_time + @as(u64, @intCast(@divTrunc(
+                last_tick.durationTo(tick).nanoseconds,
+                std.time.ns_per_ms,
+            )));
         }
+        last_tick = tick;
 
         try render_scene(
             win,
@@ -361,12 +364,13 @@ pub fn main() !void {
         try render_position(win, &position_buffer, camera, camera_distance.current);
 
         try vx.render(tty.writer());
+        try tty.writer().flush();
         frame_sync.end();
-        frame_sync.wait();
+        try frame_sync.wait();
     }
 }
 
-fn render_scene(win: vaxis.Window, buffer: *std.io.Writer.Allocating, scene: donut.Scene(donut.Geometry), camera: donut.Camera, geometry: donut.Geometry, time: f64) !void {
+fn render_scene(win: vaxis.Window, buffer: *std.Io.Writer.Allocating, scene: donut.Scene(donut.Geometry), camera: donut.Camera, geometry: donut.Geometry, time: f64) !void {
     buffer.clearRetainingCapacity();
 
     try scene.render(
@@ -393,7 +397,7 @@ fn render_scene(win: vaxis.Window, buffer: *std.io.Writer.Allocating, scene: don
     );
 }
 
-fn render_fps(win: vaxis.Window, buffer: *std.io.Writer.Allocating, frame_sync: donut.FrameSync) !void {
+fn render_fps(win: vaxis.Window, buffer: *std.Io.Writer.Allocating, frame_sync: donut.FrameSync) !void {
     buffer.clearRetainingCapacity();
     try buffer.writer.print("FPS: {d:.2}\n", .{frame_sync.fps});
 
@@ -411,7 +415,7 @@ fn render_fps(win: vaxis.Window, buffer: *std.io.Writer.Allocating, frame_sync: 
     );
 }
 
-fn render_position(win: vaxis.Window, buffer: *std.io.Writer.Allocating, camera: donut.Camera, zoom: f64) !void {
+fn render_position(win: vaxis.Window, buffer: *std.Io.Writer.Allocating, camera: donut.Camera, zoom: f64) !void {
     buffer.clearRetainingCapacity();
 
     try buffer.writer.print(
