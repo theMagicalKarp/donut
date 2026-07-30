@@ -3,15 +3,15 @@ zig = "0.16.0"
 
 [tasks.build]
 description = "Build the project"
-run = "zig build"
+run = "zig build -Doptimize=ReleaseFast"
 
 [tasks.run]
 description = "Build and run the renderer"
-run = "zig build run"
+run = "zig build run -Doptimize=ReleaseFast"
 
 [tasks.test]
 description = "Run the test suite"
-run = "zig build test"
+run = "zig build test -Doptimize=ReleaseFast"
 
 [tasks.fmt]
 description = "Check formatting without writing changes"

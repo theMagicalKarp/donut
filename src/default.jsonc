@@ -1,0 +1,176 @@
+// The configuration donut ships with, embedded in the binary and used when no
+// config file is given on the command line. Copy it, edit it, and run
+// `donut yours.jsonc`.
+//
+// Every setting outside "scene" is optional and falls back to the value below,
+// so a config file containing nothing but a "scene" array is valid.
+{
+  "render": {
+    "target_fps": 30.0,      // must be greater than 0
+    "max_steps": 80,         // ray marching iterations per pixel
+    "max_distance": 100.0,   // give up on a ray past this
+    "surface_distance": 0.01 // close enough to count as a hit
+  },
+
+  "shading": {
+    "gamma": 2.4,
+    "light": [1.0, -1.0, -1.0], // direction, normalized on load
+    "lut": ".,-~:;=!*#$@"       // dark to bright
+  },
+
+  "camera": {
+    "look_at": [0.0, 0.0, 0.0],
+    "distance": { "default": 2.0, "min": 0.1, "max": 10.0, "step": 0.1 },
+    "theta": { "default": 0.0, "step": 0.1 },
+    "phi": { "default": 1.57, "min": 0.1, "max": 3.04, "step": 0.1 }
+  },
+
+  "ui": {
+    "accent": 5
+  },
+
+  // A scene's "geometry" is a tree of signed distance functions. "type" names
+  // the variant; every other key is one of that variant's parameters. Operators
+  // nest through "geometry"; combinators put a list of children under the same
+  // key.
+  "scene": [
+    {
+      "name": "Donut",
+      "geometry": {
+        "type": "spinx",
+        "rate": 0.001,
+        "geometry": {
+          "type": "spinz",
+          "rate": 0.002,
+          "geometry": {
+            "type": "translate",
+            "direction": [0.0, 0.05, 0.0],
+            "geometry": { "type": "torus", "inner": 0.45, "outer": 1.0 }
+          }
+        }
+      }
+    },
+
+    {
+      "name": "Morph",
+      "geometry": {
+        "type": "union_smooth",
+        "smooth": 2.0,
+        "geometry": [
+          // A sphere sliding back and forth through the box.
+          {
+            "type": "lerp",
+            "start": [0.0, 0.0, 3.0],
+            "stop": [0.0, 0.0, -3.0],
+            "time_scale": 4000.0,
+            "ease": "smoother",
+            "mode": "ping_pong",
+            "geometry": { "type": "sphere", "radius": 0.25 }
+          },
+          {
+            "type": "spinx",
+            "rate": 0.001,
+            "geometry": {
+              "type": "spinz",
+              "rate": 0.001,
+              "geometry": { "type": "box", "dimensions": [0.6, 0.6, 0.6] }
+            }
+          }
+        ]
+      }
+    },
+
+    // Three copies of the same orbiting sphere, two of them offset in time so
+    // they trail each other, unioned with a tumbling box. One list, four
+    // children — nesting this as binary unions took three `union_exact` nodes.
+    {
+      "name": "The Spinz",
+      "geometry": {
+        "type": "union_exact",
+        "geometry": [
+          {
+            "type": "rotatex",
+            "angle": 0.25,
+            "geometry": {
+              "type": "spiny",
+              "rate": 0.0025,
+              "geometry": {
+                "type": "translate",
+                "direction": [0.0, 0.0, 1.5],
+                "geometry": { "type": "sphere", "radius": 0.15 }
+              }
+            }
+          },
+          {
+            "type": "time_offset",
+            "duration": 1000.0,
+            "geometry": {
+              "type": "rotatex",
+              "angle": 45.0,
+              "geometry": {
+                "type": "spiny",
+                "rate": 0.0025,
+                "geometry": {
+                  "type": "translate",
+                  "direction": [0.0, 0.0, 1.5],
+                  "geometry": { "type": "sphere", "radius": 0.15 }
+                }
+              }
+            }
+          },
+          {
+            "type": "time_offset",
+            "duration": 1500.0,
+            "geometry": {
+              "type": "rotatex",
+              "angle": 90.0,
+              "geometry": {
+                "type": "spiny",
+                "rate": 0.0025,
+                "geometry": {
+                  "type": "translate",
+                  "direction": [0.0, 0.0, 1.5],
+                  "geometry": { "type": "sphere", "radius": 0.15 }
+                }
+              }
+            }
+          },
+          {
+            "type": "spinx",
+            "rate": 0.001,
+            "geometry": {
+              "type": "spinz",
+              "rate": 0.002,
+              "geometry": {
+                "type": "translate",
+                "direction": [0.0, 0.05, 0.0],
+                "geometry": { "type": "box", "dimensions": [0.6, 0.6, 0.6] }
+              }
+            }
+          }
+        ]
+      }
+    },
+
+    // Shallow trees read fine on one line.
+    {
+      "name": "Marching Octahedrons",
+      "geometry": {
+        "type": "walk",
+        "direction": [0.00025, 0, 0],
+        "geometry": {
+          "type": "repeat",
+          "spacing": 1,
+          "geometry": {
+            "type": "spinx",
+            "rate": 0.001,
+            "geometry": {
+              "type": "octahedron",
+              "size": 0.25
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -45,7 +45,6 @@ pub const SpinX = struct {
 
 pub const RotateY = struct {
     angle: f64,
-    rate: f64,
     geometry: *const Geometry,
 
     const Self = @This();
