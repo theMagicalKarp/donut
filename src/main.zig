@@ -1,6 +1,5 @@
 const std = @import("std");
 const vaxis = @import("vaxis");
-const math = @import("zlm").as(f64);
 const math_usize = @import("zlm").as(usize);
 
 const donut = @import("donut");
@@ -13,9 +12,60 @@ const Event = union(enum) {
     focus_in,
 };
 
+const usage =
+    \\Usage: donut [config.jsonc]
+    \\
+    \\Ray marches signed distance fields into terminal ASCII. With no argument,
+    \\the configuration embedded in the binary is used; see src/default.jsonc for
+    \\a commented copy of it.
+    \\
+    \\Options:
+    \\  -h, --help   Print this help and exit
+    \\
+    \\Keys:
+    \\  a / d        Orbit left / right
+    \\  w / s        Orbit up / down
+    \\  z / Z        Zoom in / out
+    \\  r            Reset the camera
+    \\  space        Pause
+    \\  t            Next scene
+    \\  q, Ctrl-C    Quit
+    \\
+;
+
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
     const allocator = init.gpa;
+
+    // Everything that can reject the invocation happens before the tty goes into
+    // raw mode, so a usage or config error lands in a clean terminal.
+    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
+    defer args.deinit();
+    _ = args.skip();
+
+    var config_path: ?[]const u8 = null;
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
+            write(io, .stdout, usage);
+            return;
+        }
+        if (config_path != null) {
+            write(io, .stderr, "donut: unexpected extra argument\n\n" ++ usage);
+            std.process.exit(1);
+        }
+        config_path = arg;
+    }
+
+    var diagnostic: donut.Diagnostic = .{};
+    var config = if (config_path) |path|
+        donut.Config.fromFile(allocator, io, path, &diagnostic) catch |err|
+            configFailed(io, path, err, &diagnostic)
+    else
+        donut.Config.fromSlice(allocator, donut.default_config, &diagnostic) catch |err|
+            configFailed(io, "<built-in default>", err, &diagnostic);
+    defer config.deinit();
+
+    const accent: vaxis.Color = .{ .index = config.ui.accent };
 
     var title_buffer = std.Io.Writer.Allocating.init(allocator);
     defer title_buffer.deinit();
@@ -43,208 +93,33 @@ pub fn main(init: std.process.Init) !void {
     try vx.enterAltScreen(tty.writer());
     try vx.queryTerminal(tty.writer(), .fromSeconds(1));
 
-    const gamma: f32 = 2.4;
-    const light_position = math.vec3(1.0, -1.0, -1.0).normalize();
+    var scene_index: usize = 0;
 
-    var geometry_index: usize = 0;
-    const titles = [_][]const u8{
-        "Donut",
-        "Morph",
-        "The Spinz",
-        "Marching Octahedrons",
+    const scene = donut.Scene(donut.Geometry){
+        .shading = config.shading,
+        .max_steps = config.render.max_steps,
+        .max_distance = config.render.max_distance,
+        .surface_distance = config.render.surface_distance,
     };
-
-    const geometry: []const donut.Geometry = &.{
-        .{
-            .spinx = .{
-                .geometry = &.{
-                    .spinz = .{
-                        .geometry = &.{
-                            .translate = .{
-                                .geometry = &.{ .torus = .{ .inner = 0.45, .outer = 1.0 } },
-                                .direction = math.vec3(0.0, 0.05, 0.0),
-                            },
-                        },
-                        .rate = 0.002,
-                    },
-                },
-                .rate = 0.001,
-            },
-        },
-        .{
-            .union_smooth = .{
-                .a = &.{
-                    .lerp = .{
-                        .geometry = &.{ .sphere = .{ .radius = 0.25 } },
-                        .start = math.vec3(0.0, 0.0, 3.0),
-                        .stop = math.vec3(0.0, 0.0, -3.0),
-                        .time_scale = 4000.0,
-                        .ease = .smoother,
-                        .mode = .ping_pong,
-                    },
-                },
-                .b = &.{
-                    .spinx = .{
-                        .geometry = &.{
-                            .spinz = .{
-                                .geometry = &.{
-                                    .box = .{ .dimensions = math.vec3(0.6, 0.6, 0.6) },
-                                },
-                                .rate = 0.001,
-                            },
-                        },
-                        .rate = 0.001,
-                    },
-                },
-                .smooth = 2.0,
-            },
-        },
-        .{
-            .union_exact = .{
-                .a = &.{
-                    .union_exact = .{
-                        .a = &.{
-                            .rotatex = .{
-                                .geometry = &.{
-                                    .spiny = .{
-                                        .geometry = &.{
-                                            .translate = .{
-                                                .geometry = &.{ .sphere = .{ .radius = 0.15 } },
-                                                .direction = math.vec3(0.0, 0.0, 1.5),
-                                            },
-                                        },
-                                        .rate = 0.0025,
-                                    },
-                                },
-                                .angle = 0.25,
-                            },
-                        },
-                        .b = &.{
-                            .time_offset = .{
-                                .geometry = &.{
-                                    .rotatex = .{
-                                        .geometry = &.{
-                                            .spiny = .{
-                                                .geometry = &.{
-                                                    .translate = .{
-                                                        .geometry = &.{ .sphere = .{ .radius = 0.15 } },
-                                                        .direction = math.vec3(0.0, 0.0, 1.5),
-                                                    },
-                                                },
-                                                .rate = 0.0025,
-                                            },
-                                        },
-                                        .angle = 45.0,
-                                    },
-                                },
-                                .duration = 1000.0,
-                            },
-                        },
-                    },
-                },
-                .b = &.{
-                    .union_exact = .{
-                        .a = &.{
-                            .time_offset = .{
-                                .geometry = &.{
-                                    .rotatex = .{
-                                        .geometry = &.{
-                                            .spiny = .{
-                                                .geometry = &.{
-                                                    .translate = .{
-                                                        .geometry = &.{ .sphere = .{ .radius = 0.15 } },
-                                                        .direction = math.vec3(0.0, 0.0, 1.5),
-                                                    },
-                                                },
-                                                .rate = 0.0025,
-                                            },
-                                        },
-                                        .angle = 90.0,
-                                    },
-                                },
-                                .duration = 1500.0,
-                            },
-                        },
-                        .b = &.{
-                            .spinx = .{
-                                .geometry = &.{
-                                    .spinz = .{
-                                        .geometry = &.{
-                                            .translate = .{
-                                                .geometry = &.{
-                                                    .box = .{ .dimensions = math.vec3(0.6, 0.6, 0.6) },
-                                                },
-                                                .direction = math.vec3(0.0, 0.05, 0.0),
-                                            },
-                                        },
-                                        .rate = 0.002,
-                                    },
-                                },
-                                .rate = 0.001,
-                            },
-                        },
-                    },
-                },
-            },
-        },
-        .{
-            .walk = .{
-                .geometry = &.{
-                    .repeat = .{
-                        .geometry = &.{
-                            .spinx = .{
-                                .geometry = &.{ .octahedron = .{ .size = 0.25 } },
-                                .rate = 0.001,
-                            },
-                        },
-                        .spacing = 1.0,
-                    },
-                },
-                .direction = math.vec3(0.00025, 0.0, 0.0),
-            },
-        },
-    };
-
-    const scene = donut.Scene(donut.Geometry).new(
-        donut.Shading.new(light_position, gamma),
-    );
 
     var paused: bool = false;
-    var camera_distance = donut.Interval(f64){
-        .current = 2.0,
-        .default = 2.0,
-        .min = 0.1,
-        .max = 10.0,
-        .step = 0.1,
-    };
-    var camera_theta = donut.Interval(f64){
-        .current = 0.0,
-        .default = 0.0,
-        .min = -std.math.floatMax(f64),
-        .max = std.math.floatMax(f64),
-        .step = 0.1,
-    };
-    var camera_phi = donut.Interval(f64){
-        .current = 1.57,
-        .default = 1.57,
-        .min = 0.1,
-        .max = 3.04,
-        .step = 0.1,
-    };
+    var camera_distance = config.camera.distance;
+    var camera_theta = config.camera.theta;
+    var camera_phi = config.camera.phi;
 
     var camera = donut.Camera{
         .position = donut.Camera.orbit(
-            math.vec3(0.0, 0.0, 0.0),
+            config.camera.look_at,
             camera_distance.current,
             camera_theta.current,
             camera_phi.current,
         ),
         .resolution = math_usize.vec2(0, 0),
-        .look_at = math.vec3(0.0, 0.0, 0.0),
+        .look_at = config.camera.look_at,
     };
     var total_time: u64 = 0;
     var last_tick = clock.now(io);
-    var frame_sync = donut.FrameSync.new(io, 30.0);
+    var frame_sync = donut.FrameSync.new(io, config.render.target_fps);
 
     while (true) {
         frame_sync.start();
@@ -311,7 +186,7 @@ pub fn main(init: std.process.Init) !void {
                     } else if (key.matches(' ', .{})) {
                         paused = !paused;
                     } else if (key.matches('t', .{})) {
-                        geometry_index = (geometry_index + 1) % geometry.len;
+                        scene_index = (scene_index + 1) % config.scenes.len;
                     }
                 },
 
@@ -340,11 +215,12 @@ pub fn main(init: std.process.Init) !void {
             &scene_buffer,
             scene,
             camera,
-            geometry[geometry_index],
+            config.scenes[scene_index].geometry.*,
             @floatFromInt(total_time),
+            accent,
         );
 
-        const title = titles[geometry_index];
+        const title = config.scenes[scene_index].name;
         title_buffer.clearRetainingCapacity();
         try title_buffer.writer.print("({s})", .{title});
         _ = win.child(.{
@@ -355,13 +231,13 @@ pub fn main(init: std.process.Init) !void {
         }).printSegment(
             .{ .text = title_buffer.written(), .style = .{
                 .bold = true,
-                .fg = .{ .index = 5 },
+                .fg = accent,
             } },
             .{ .wrap = .grapheme },
         );
 
-        try render_fps(win, &fps_buffer, frame_sync);
-        try render_position(win, &position_buffer, camera, camera_distance.current);
+        try render_fps(win, &fps_buffer, frame_sync, accent);
+        try render_position(win, &position_buffer, camera, camera_distance.current, accent);
 
         try vx.render(tty.writer());
         try tty.writer().flush();
@@ -370,7 +246,7 @@ pub fn main(init: std.process.Init) !void {
     }
 }
 
-fn render_scene(win: vaxis.Window, buffer: *std.Io.Writer.Allocating, scene: donut.Scene(donut.Geometry), camera: donut.Camera, geometry: donut.Geometry, time: f64) !void {
+fn render_scene(win: vaxis.Window, buffer: *std.Io.Writer.Allocating, scene: donut.Scene(donut.Geometry), camera: donut.Camera, geometry: donut.Geometry, time: f64, accent: vaxis.Color) !void {
     buffer.clearRetainingCapacity();
 
     try scene.render(
@@ -388,7 +264,7 @@ fn render_scene(win: vaxis.Window, buffer: *std.Io.Writer.Allocating, scene: don
         .border = .{
             .where = .all,
             .style = .{
-                .fg = .{ .index = 5 },
+                .fg = accent,
             },
         },
     }).printSegment(
@@ -397,7 +273,7 @@ fn render_scene(win: vaxis.Window, buffer: *std.Io.Writer.Allocating, scene: don
     );
 }
 
-fn render_fps(win: vaxis.Window, buffer: *std.Io.Writer.Allocating, frame_sync: donut.FrameSync) !void {
+fn render_fps(win: vaxis.Window, buffer: *std.Io.Writer.Allocating, frame_sync: donut.FrameSync, accent: vaxis.Color) !void {
     buffer.clearRetainingCapacity();
     try buffer.writer.print("FPS: {d:.2}\n", .{frame_sync.fps});
 
@@ -409,13 +285,13 @@ fn render_fps(win: vaxis.Window, buffer: *std.Io.Writer.Allocating, frame_sync: 
     }).printSegment(
         .{ .text = buffer.written(), .style = .{
             .bold = true,
-            .fg = .{ .index = 5 },
+            .fg = accent,
         } },
         .{ .wrap = .grapheme },
     );
 }
 
-fn render_position(win: vaxis.Window, buffer: *std.Io.Writer.Allocating, camera: donut.Camera, zoom: f64) !void {
+fn render_position(win: vaxis.Window, buffer: *std.Io.Writer.Allocating, camera: donut.Camera, zoom: f64, accent: vaxis.Color) !void {
     buffer.clearRetainingCapacity();
 
     try buffer.writer.print(
@@ -436,8 +312,37 @@ fn render_position(win: vaxis.Window, buffer: *std.Io.Writer.Allocating, camera:
     }).printSegment(
         .{ .text = buffer.written(), .style = .{
             .bold = true,
-            .fg = .{ .index = 5 },
+            .fg = accent,
         } },
         .{ .wrap = .grapheme },
     );
+}
+
+fn write(io: std.Io, stream: enum { stdout, stderr }, bytes: []const u8) void {
+    var buffer: [256]u8 = undefined;
+    const file: std.Io.File = switch (stream) {
+        .stdout => .stdout(),
+        .stderr => .stderr(),
+    };
+    var out = file.writerStreaming(io, &buffer);
+    out.interface.writeAll(bytes) catch {};
+    out.interface.flush() catch {};
+}
+
+fn configFailed(
+    io: std.Io,
+    source: []const u8,
+    err: anyerror,
+    diagnostic: *const donut.Diagnostic,
+) noreturn {
+    var buffer: [640]u8 = undefined;
+    const detail = diagnostic.message();
+    const message = std.fmt.bufPrint(
+        &buffer,
+        "donut: {s}: {s}\n",
+        .{ source, if (detail.len != 0) detail else @errorName(err) },
+    ) catch "donut: invalid configuration\n";
+
+    write(io, .stderr, message);
+    std.process.exit(1);
 }

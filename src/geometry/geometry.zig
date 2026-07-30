@@ -25,7 +25,7 @@ const Walk = @import("translate.zig").Walk;
 
 pub const Geometry = union(enum) {
     box: Box,
-    BoxFrame: BoxFrame,
+    box_frame: BoxFrame,
     intersection: Intersection,
     lerp: Lerp,
     octahedron: Octahedron,
