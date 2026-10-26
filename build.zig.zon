@@ -2,15 +2,15 @@
     .name = .donut,
     .version = "0.0.0",
     .fingerprint = 0x8ebc1f793621bd75, // Changing this has security and trust implications.
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .vaxis = .{
-            .url = "git+https://github.com/rockorager/libvaxis.git#cca454be4e002dbe1a386ff0fd3420ea21813fb5",
-            .hash = "vaxis-0.6.0-BWNV_DYXCgBP-oydkwMvwclWtjMrMAmSmg7cO6wtYFno",
+            .url = "git+https://github.com/rockorager/libvaxis.git#d4c3b3666e0c090e2b5092ca09893c6db15e0b79",
+            .hash = "vaxis-0.6.0-BWNV_O8ODQBFLRjA4D0q75pHPh63iPu_v0yhpCwsAMaM",
         },
         .zlm = .{
-            .url = "git+https://github.com/ziglibs/zlm#35ab7df57cfb5392a11486f6e4b03a82f849a118",
-            .hash = "zlm-0.1.0-LoZ6yDawAADMopilIe9MDzer0UqmruCy_PuhNv4OMc7c",
+            .url = "git+https://github.com/ziglibs/zlm.git#fde6ad83e5f9c6d5e97998a2413453449e6c5f30",
+            .hash = "zlm-0.1.0-LoZ6yDSxAADoUzGtE_qajExDKr0kx1bVJyX0YOTzT3A3",
         },
     },
     .paths = .{
