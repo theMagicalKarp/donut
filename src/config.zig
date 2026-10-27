@@ -359,9 +359,9 @@ fn wantEnum(comptime T: type, ctx: *ErrCtx, key: []const u8, value: Value) Error
 fn enumNames(comptime T: type) []const u8 {
     comptime {
         var out: []const u8 = "";
-        for (@typeInfo(T).@"enum".fields, 0..) |field, i| {
+        for (@typeInfo(T).@"enum".field_names, 0..) |field_name, i| {
             if (i != 0) out = out ++ ", ";
-            out = out ++ field.name;
+            out = out ++ field_name;
         }
         return out;
     }
@@ -375,8 +375,8 @@ fn checkKeys(comptime T: type, object: Object, ctx: *ErrCtx, comptime allow_type
     next_key: while (it.next()) |entry| {
         const key = entry.key_ptr.*;
         if (allow_type and std.mem.eql(u8, key, "type")) continue;
-        inline for (@typeInfo(T).@"struct".fields) |field| {
-            if (std.mem.eql(u8, key, field.name)) continue :next_key;
+        inline for (@typeInfo(T).@"struct".field_names) |field_name| {
+            if (std.mem.eql(u8, key, field_name)) continue :next_key;
         }
         return ctx.fail(error.UnknownField, "unknown key '{s}'", .{key});
     }
@@ -566,24 +566,26 @@ fn parseGeometry(
     const tag_value = object.get("type") orelse return ctx.fail(error.MissingType, "missing 'type'", .{});
     const tag = try wantString(ctx, "type", tag_value);
 
-    inline for (@typeInfo(Geometry).@"union".fields) |variant| {
-        if (std.mem.eql(u8, variant.name, tag)) {
-            try checkKeys(variant.type, object, ctx, true);
+    const variants = @typeInfo(Geometry).@"union";
+    inline for (variants.field_names, variants.field_types) |variant_name, Variant| {
+        if (std.mem.eql(u8, variant_name, tag)) {
+            try checkKeys(Variant, object, ctx, true);
 
-            var payload: variant.type = undefined;
-            inline for (@typeInfo(variant.type).@"struct".fields) |field| {
-                @field(payload, field.name) = try parseField(
-                    field.type,
+            var payload: Variant = undefined;
+            const fields = @typeInfo(Variant).@"struct";
+            inline for (fields.field_names, fields.field_types) |field_name, FieldType| {
+                @field(payload, field_name) = try parseField(
+                    FieldType,
                     arena,
                     object,
-                    field.name,
+                    field_name,
                     ctx,
                     depth,
                 );
             }
 
             const node = try arena.create(Geometry);
-            node.* = @unionInit(Geometry, variant.name, payload);
+            node.* = @unionInit(Geometry, variant_name, payload);
             return node;
         }
     }
@@ -675,9 +677,9 @@ fn expectFails(source: []const u8, expected: Error) !void {
 }
 
 test "every Geometry variant is constructible from JSONC" {
-    inline for (@typeInfo(Geometry).@"union".fields) |variant| {
-        inline for (@typeInfo(variant.type).@"struct".fields) |field| {
-            _ = comptime fieldKind(field.type);
+    inline for (@typeInfo(Geometry).@"union".field_types) |Variant| {
+        inline for (@typeInfo(Variant).@"struct".field_types) |FieldType| {
+            _ = comptime fieldKind(FieldType);
         }
     }
 }

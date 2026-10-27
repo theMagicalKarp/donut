@@ -10,7 +10,7 @@ terminal, written in [Zig](https://ziglang.org/) and inspired by
 
 ## Requirements
 
-- [Zig](https://ziglang.org/) 0.16.0 (pinned in `mise.toml`)
+- [Zig](https://ziglang.org/) 0.17.0 (pinned in `mise.toml`)
 
 ## Run / Test / Format
 
@@ -54,28 +54,28 @@ within them falls back to the value shown here, so a file containing nothing but
 ```jsonc
 {
   "render": {
-    "target_fps": 30.0,      // must be greater than 0
-    "max_steps": 80,         // ray marching iterations per pixel
-    "max_distance": 100.0,   // give up on a ray past this
-    "surface_distance": 0.01 // how close counts as a hit
+    "target_fps": 30.0, // must be greater than 0
+    "max_steps": 80, // ray marching iterations per pixel
+    "max_distance": 100.0, // give up on a ray past this
+    "surface_distance": 0.01, // how close counts as a hit
   },
 
   "shading": {
     "gamma": 2.4,
     "light": [1.0, -1.0, -1.0], // normalized on load
-    "lut": ".,-~:;=!*#$@"       // dark to light
+    "lut": ".,-~:;=!*#$@", // dark to light
   },
 
   "camera": {
     "look_at": [0.0, 0.0, 0.0],
     "distance": { "default": 2.0, "min": 0.1, "max": 10.0, "step": 0.1 },
     "theta": { "default": 0.0, "step": 0.1 }, // min/max default to ±floatMax
-    "phi": { "default": 1.57, "min": 0.1, "max": 3.04, "step": 0.1 }
+    "phi": { "default": 1.57, "min": 0.1, "max": 3.04, "step": 0.1 },
   },
 
   "ui": {
-    "accent": 5 // terminal palette index for the border and status text
-  }
+    "accent": 5, // terminal palette index for the border and status text
+  },
 }
 ```
 
@@ -95,11 +95,11 @@ file order.
         "geometry": {
           "type": "translate",
           "direction": [0.0, 0.05, 0.0],
-          "geometry": { "type": "torus", "inner": 0.45, "outer": 1.0 }
-        }
-      }
-    }
-  ]
+          "geometry": { "type": "torus", "inner": 0.45, "outer": 1.0 },
+        },
+      },
+    },
+  ],
 }
 ```
 
@@ -113,59 +113,71 @@ same key. Shallow trees read fine on one line:
 ```jsonc
 {
   "name": "Marching Octahedrons",
-  "geometry": { "type": "walk", "direction": [0.00025, 0.0, 0.0],
-    "geometry": { "type": "repeat", "spacing": 1.0,
-      "geometry": { "type": "spinx", "rate": 0.001,
-        "geometry": { "type": "octahedron", "size": 0.25 } } } }
+  "geometry": {
+    "type": "walk",
+    "direction": [0.00025, 0.0, 0.0],
+    "geometry": {
+      "type": "repeat",
+      "spacing": 1.0,
+      "geometry": {
+        "type": "spinx",
+        "rate": 0.001,
+        "geometry": { "type": "octahedron", "size": 0.25 },
+      },
+    },
+  },
 }
 ```
 
 **Shapes** take no child:
 
-| `type`       | Parameters                    |
-| :----------- | :---------------------------- |
-| `box`        | `dimensions`                  |
-| `box_frame`  | `dimensions`, `thickness`     |
-| `octahedron` | `size`                        |
-| `sphere`     | `radius`                      |
-| `torus`      | `inner`, `outer`              |
+| `type`       | Parameters                |
+| :----------- | :------------------------ |
+| `box`        | `dimensions`              |
+| `box_frame`  | `dimensions`, `thickness` |
+| `octahedron` | `size`                    |
+| `sphere`     | `radius`                  |
+| `torus`      | `inner`, `outer`          |
 
 **Operators** wrap a single child under `geometry`:
 
-| `type`        | Parameters                                          |
-| :------------ | :-------------------------------------------------- |
-| `rotatex`     | `angle`                                             |
-| `rotatey`     | `angle`                                             |
-| `rotatez`     | `angle`                                             |
-| `spinx`       | `rate` (radians per millisecond)                    |
-| `spiny`       | `rate`                                              |
-| `spinz`       | `rate`                                              |
-| `translate`   | `direction`                                         |
-| `walk`        | `direction` (scaled by time)                        |
-| `scale`       | `amount`                                            |
-| `repeat`      | `spacing` (tiles the child through all space)       |
-| `transform`   | `matrix` (4 rows of 4 numbers)                      |
-| `time_offset` | `duration` (shifts the child's clock)               |
-| `lerp`        | `start`, `stop`, `time_scale`, `ease`, `mode`       |
+| `type`        | Parameters                                    |
+| :------------ | :-------------------------------------------- |
+| `rotatex`     | `angle`                                       |
+| `rotatey`     | `angle`                                       |
+| `rotatez`     | `angle`                                       |
+| `spinx`       | `rate` (radians per millisecond)              |
+| `spiny`       | `rate`                                        |
+| `spinz`       | `rate`                                        |
+| `translate`   | `direction`                                   |
+| `walk`        | `direction` (scaled by time)                  |
+| `scale`       | `amount`                                      |
+| `repeat`      | `spacing` (tiles the child through all space) |
+| `transform`   | `matrix` (4 rows of 4 numbers)                |
+| `time_offset` | `duration` (shifts the child's clock)         |
+| `lerp`        | `start`, `stop`, `time_scale`, `ease`, `mode` |
 
 `lerp` slides its child between two points; `ease` is one of `linear`, `smooth`,
 `smoother` and `mode` is `loop` or `ping_pong`.
 
 **Combinators** take a list of children under `geometry`, one or more:
 
-| `type`          | Parameters                                        |
-| :-------------- | :------------------------------------------------ |
-| `union_exact`   | none                                              |
-| `union_smooth`  | `smooth` (blend radius)                           |
-| `intersection`  | none                                              |
-| `subtraction`   | none (carves every later child out of the first)  |
+| `type`         | Parameters                                       |
+| :------------- | :----------------------------------------------- |
+| `union_exact`  | none                                             |
+| `union_smooth` | `smooth` (blend radius)                          |
+| `intersection` | none                                             |
+| `subtraction`  | none (carves every later child out of the first) |
 
 ```jsonc
-{ "type": "union_exact", "geometry": [
+{
+  "type": "union_exact",
+  "geometry": [
     { "type": "sphere", "radius": 1.0 },
     { "type": "box", "dimensions": [1.0, 1.0, 1.0] },
-    { "type": "torus", "inner": 0.4, "outer": 1.0 }
-] }
+    { "type": "torus", "inner": 0.4, "outer": 1.0 },
+  ],
+}
 ```
 
 Order only matters for two of them. `union_exact` and `intersection` are `min`
