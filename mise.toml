@@ -24,3 +24,46 @@ run = "zig fmt --exclude zig-pkg ."
 [tasks.check]
 description = "Run everything CI runs"
 depends = ["test", "fmt"]
+
+[tasks.gif]
+description = "Record each showcased scene with asciinema and render its docs/assets gif"
+depends = ["build"]
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+# scene index (into src/default.jsonc) : gif name
+for entry in 0:donut 1:morph 2:spinz; do
+  scene=${entry%%:*}
+  name=${entry#*:}
+  echo "Recording $name (scene $scene) for ${DURATION}s at ${SIZE} (skipping the first ${SKIP}s)..."
+  asciinema rec --headless --overwrite --idle-time-limit 0.1 \
+    --window-size "$SIZE" \
+    --command "zig-out/bin/donut --headless --scene $scene --duration $((DURATION + SKIP))" \
+    "$tmp/$name.cast"
+  # Drop the final output event, the exit teardown (clear + leave alt screen), so the last frame isn't blank.
+  # Then fast-forward through the first $SKIP seconds: those events are kept but given zero delay, so the
+  # gif opens on the frame as it stood at $SKIP seconds.
+  jq -c -s --argjson skip "$SKIP" '
+    del(.[map(type == "array" and .[1] == "o") | rindex(true)])
+    | .[0], foreach .[1:][] as $e (0; . + $e[0]; if . < $skip then [0] + $e[1:] else $e end)
+  ' "$tmp/$name.cast" > "$tmp/$name.trimmed.cast"
+  agg --font-family "$FONT" --theme "$THEME" --font-size 14 --fps-cap "$FPS" --last-frame-duration 0 \
+    "$tmp/$name.trimmed.cast" "docs/assets/$name.gif"
+  echo "Wrote docs/assets/$name.gif"
+done
+"""
+
+[tasks.gif.tools]
+"github:asciinema/asciinema" = "3.2.1"
+"github:asciinema/agg" = "1.9.0"
+jq = "1.8.2"
+
+[tasks.gif.env]
+DURATION = "10"
+SKIP = "2"
+SIZE = "192x51"
+FPS = "30"
+THEME = "asciinema"
+FONT = "JetBrainsMono Nerd Font Mono"

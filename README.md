@@ -23,6 +23,10 @@ mise run test
 mise run fmt
 # auto format
 mise run fix
+# run everything CI runs
+mise run check
+# re-record the docs/assets gifs (needs no local installs beyond mise)
+mise run gif
 ```
 
 ## Configuration
@@ -34,6 +38,13 @@ quality) comes from a JSONC file (JSON plus `//` and `/* */` comments):
 donut my-scenes.jsonc
 donut --help
 ```
+
+| Flag             | Description                                                                 |
+| ---------------- | --------------------------------------------------------------------------- |
+| `--scene <n>`    | start on scene `n` (0-based) instead of the first                           |
+| `--headless`     | skip the terminal capability query (for headless recording)                 |
+| `--duration <s>` | exit on its own after `s` seconds                                           |
+| `-h`, `--help`   | print usage and exit                                                        |
 
 With no argument the configuration embedded in the binary is used. That embedded
 copy is [`src/default.jsonc`](./src/default.jsonc), which is a commented, working

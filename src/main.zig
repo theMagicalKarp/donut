@@ -13,14 +13,17 @@ const Event = union(enum) {
 };
 
 const usage =
-    \\Usage: donut [config.jsonc]
+    \\Usage: donut [options] [config.jsonc]
     \\
     \\Ray marches signed distance fields into terminal ASCII. With no argument,
     \\the configuration embedded in the binary is used; see src/default.jsonc for
     \\a commented copy of it.
     \\
     \\Options:
-    \\  -h, --help   Print this help and exit
+    \\  --scene <n>     Start on scene n (0-based) instead of the first
+    \\  --headless      Skip the terminal capability query (for headless recording)
+    \\  --duration <s>  Exit on its own after s seconds
+    \\  -h, --help      Print this help and exit
     \\
     \\Keys:
     \\  a / d        Orbit left / right
@@ -44,16 +47,30 @@ pub fn main(init: std.process.Init) !void {
     _ = args.skip();
 
     var config_path: ?[]const u8 = null;
+    var initial_scene: usize = 0;
+    // Headless terminals (e.g. `asciinema rec --headless`) never answer the
+    // capability query, which stalls startup on a blank screen until it times out.
+    var headless = false;
+    var duration: ?u32 = null;
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
             write(io, .stdout, usage);
             return;
+        } else if (std.mem.eql(u8, arg, "--scene")) {
+            const value = args.next() orelse usageError(io, "--scene requires a value");
+            initial_scene = std.fmt.parseInt(usize, value, 10) catch
+                usageError(io, "invalid --scene value");
+        } else if (std.mem.eql(u8, arg, "--duration")) {
+            const value = args.next() orelse usageError(io, "--duration requires a value");
+            duration = std.fmt.parseInt(u32, value, 10) catch
+                usageError(io, "invalid --duration value");
+        } else if (std.mem.eql(u8, arg, "--headless")) {
+            headless = true;
+        } else if (config_path != null) {
+            usageError(io, "unexpected extra argument");
+        } else {
+            config_path = arg;
         }
-        if (config_path != null) {
-            write(io, .stderr, "donut: unexpected extra argument\n\n" ++ usage);
-            std.process.exit(1);
-        }
-        config_path = arg;
     }
 
     var diagnostic: donut.Diagnostic = .{};
@@ -64,6 +81,8 @@ pub fn main(init: std.process.Init) !void {
         donut.Config.fromSlice(allocator, donut.default_config, &diagnostic) catch |err|
             configFailed(io, "<built-in default>", err, &diagnostic);
     defer config.deinit();
+
+    if (initial_scene >= config.scenes.len) usageError(io, "--scene is out of range");
 
     const accent: vaxis.Color = .{ .index = config.ui.accent };
 
@@ -91,9 +110,9 @@ pub fn main(init: std.process.Init) !void {
     defer loop.stop();
 
     try vx.enterAltScreen(tty.writer());
-    try vx.queryTerminal(tty.writer(), .fromSeconds(1));
+    if (!headless) try vx.queryTerminal(tty.writer(), .fromSeconds(1));
 
-    var scene_index: usize = 0;
+    var scene_index = initial_scene;
 
     const scene = donut.Scene(donut.Geometry){
         .shading = config.shading,
@@ -120,8 +139,16 @@ pub fn main(init: std.process.Init) !void {
     var total_time: u64 = 0;
     var last_tick = clock.now(io);
     var frame_sync = donut.FrameSync.new(io, config.render.target_fps);
+    const deadline: ?std.Io.Timestamp = if (duration) |seconds|
+        last_tick.addDuration(.fromSeconds(seconds))
+    else
+        null;
 
     while (true) {
+        if (deadline) |d| {
+            if (clock.now(io).durationTo(d).nanoseconds <= 0) return;
+        }
+
         frame_sync.start();
         while (try loop.tryEvent()) |event| {
             switch (event) {
@@ -327,6 +354,13 @@ fn write(io: std.Io, stream: enum { stdout, stderr }, bytes: []const u8) void {
     var out = file.writerStreaming(io, &buffer);
     out.interface.writeAll(bytes) catch {};
     out.interface.flush() catch {};
+}
+
+/// Reports a bad command line and exits; runs before the tty is in raw mode,
+/// so nothing needs restoring.
+fn usageError(io: std.Io, comptime message: []const u8) noreturn {
+    write(io, .stderr, "donut: " ++ message ++ "\n\n" ++ usage);
+    std.process.exit(1);
 }
 
 fn configFailed(
